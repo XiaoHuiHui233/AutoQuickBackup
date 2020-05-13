@@ -1,15 +1,13 @@
 # AutoQuickBackup
 ---------
 
-[English](https://github.com/XiaoHuiHui233/AutoQuickBackup/blob/master/README_en.md)
-
 一个支持多槽位的自动快速备份＆回档插件，由[QuickBackupM](https://github.com/TISUnion/QuickBackupM)改编而来
 
 为保证时间效率，仅支持全量备份，且不会压缩
 
 需要 `0.8.2-alpha` 以上的 [MCDReforged](https://github.com/Fallen-Breath/MCDReforged)
 
-![snapshot](https://raw.githubusercontent.com/TISUnion/QuickBackupM/master/snapshot.png)
+![snapshot](https://raw.githubusercontent.com/XiaoHuiHui233/AutoQuickBackup/master/snapshot.png)
 
 备份的存档将会存放至 auto_qb_multi 文件夹中，文件目录格式如下：
 ```
