@@ -273,7 +273,7 @@ def schedule_backup(server, info):
         print_message(server, info, '§a备份§r失败，错误代码{}'.format(e))
     finally:
         creating_backup.release()
-        if config['TurnOf、fAutoSave']:
+        if config['TurnOffAutoSave']:
             server.execute('save-on')
 
 
