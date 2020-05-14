@@ -406,7 +406,7 @@ def enable(server, info):
         return
     try:
         config['Enable'] = True
-        write()
+        write(server)
     except Exception as e:
         traceback.print_exc()
         print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
@@ -420,7 +420,7 @@ def disable(server, info):
         return
     try:
         config['Enable'] = False
-        write()
+        write(server)
     except Exception as e:
         traceback.print_exc()
         print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
@@ -434,7 +434,7 @@ def interval(server, info, time):
         return
     try:
         config['Interval'] = t
-        write()
+        write(server)
     except Exception as e:
         traceback.print_exc()
         print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
@@ -448,7 +448,7 @@ def slot(server, info, slot):
         return
     try:
         config['SlotCount'] = slot_count
-        write()
+        write(server)
     except Exception as e:
         traceback.print_exc()
         print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
