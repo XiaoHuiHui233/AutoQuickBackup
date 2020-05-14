@@ -464,7 +464,7 @@ def on_user_info(server, info):
     cmd_len = len(command)
 
     # MCDR permission check
-    if cmd_len >= 2 and command[0] in config['MinimumPermissionLevel'].keys():
+    if cmd_len >= 2 and command[1] in config['MinimumPermissionLevel'].keys():
         if server.get_permission_level(info) < config['MinimumPermissionLevel'][command[0]]:
             print_message(server, info, '§c权限不足！§r')
             return
