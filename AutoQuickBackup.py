@@ -5,6 +5,7 @@ import shutil
 import time
 from threading import Lock, Thread
 from utils.rtext import *
+from utils import constant, tool
 import ruamel.yaml as yaml
 import json
 import copy
@@ -271,7 +272,7 @@ def schedule_backup(server, info):
         print_message(server, info, '§a备份§r失败，错误代码{}'.format(e))
     finally:
         creating_backup.release()
-        if config['TurnOffAutoSave']:
+        if config['TurnOf、fAutoSave']:
             server.execute('save-on')
 
 
@@ -455,6 +456,10 @@ def on_info(server, info):
             global game_saved
             game_saved = True
         return
+    
+    if(tool.version_compare(constant.VERSION, '0.9.1-alpha') == -1):
+        on_user_info(server, info)
+
 
 def on_user_info(server, info):
     command = info.content.split()
@@ -465,7 +470,7 @@ def on_user_info(server, info):
 
     # MCDR permission check
     if cmd_len >= 2 and command[1] in config['MinimumPermissionLevel'].keys():
-        if server.get_permission_level(info) < config['MinimumPermissionLevel'][command[0]]:
+        if server.get_permission_level(info) < config['MinimumPermissionLevel'][command[1]]:
             print_message(server, info, '§c权限不足！§r')
             return
 
