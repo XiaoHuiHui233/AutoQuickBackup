@@ -118,7 +118,7 @@ def saveDefaultConfig():
 
 def read(server):
     if not os.path.exists('./config/AutoQuickBackup'):
-        os.mkdirs('./config/AutoQuickBackup')
+        os.makedirs('./config/AutoQuickBackup')
     if not os.path.exists('./config/AutoQuickBackup/config.yml'):
         saveDefaultConfig()
         return
@@ -130,7 +130,7 @@ def read(server):
 
 def write(server):
     if not os.path.exists('./config/AutoQuickBackup'):
-        os.mkdirs('./config/AutoQuickBackup')
+        os.makedirs('./config/AutoQuickBackup')
     with open('./config/AutoQuickBackup/config.yml', 'w', encoding='UTF-8') as wf:
         yaml.dump(config, wf, default_flow_style=False, allow_unicode=True)
 
