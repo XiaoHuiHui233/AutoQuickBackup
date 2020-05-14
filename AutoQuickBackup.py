@@ -407,7 +407,7 @@ def enable(server, info):
         config['Enable'] = True
         write()
     except Exception as e:
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.with_traceback)
+        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.__traceback__)
         return
     print_message(server, info, '§a修改§r成功')
     schedule_backup(server, info)
@@ -420,7 +420,7 @@ def disable(server, info):
         config['Enable'] = False
         write()
     except Exception as e:
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.with_traceback)
+        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.__traceback__)
         return
     print_message(server, info, '§a修改§r成功')
 
@@ -433,7 +433,7 @@ def interval(server, info, time):
         config['Interval'] = t
         write()
     except Exception as e:
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.with_traceback)
+        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.__traceback__)
         return
     print_message(server, info, '§a修改§r成功，将在下次自动存档后生效')
 
@@ -446,7 +446,7 @@ def slot(server, info, slot):
         config['SlotCount'] = slot_count
         write()
     except Exception as e:
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.with_traceback)
+        print_message(server, info, '§c修改§r保存失败.错误代码:' + e.__traceback__)
         return
     print_message(server, info, '§a修改§r成功')
 
