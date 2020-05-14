@@ -116,10 +116,8 @@ def saveDefaultConfig():
 
 
 def read(server):
-    if not os.path.exists('./config'):
-        os.mkdir('./config')
     if not os.path.exists('./config/AutoQuickBackup'):
-        os.mkdir('./config/AutoQuickBackup')
+        os.mkdirs('./config/AutoQuickBackup')
     if not os.path.exists('./config/AutoQuickBackup/config.yml'):
         saveDefaultConfig()
         return
@@ -130,10 +128,8 @@ def read(server):
             saveDefaultConfig()
 
 def write(server):
-    if not os.path.exists('./config'):
-        os.mkdir('./config')
     if not os.path.exists('./config/AutoQuickBackup'):
-        os.mkdir('./config/AutoQuickBackup')
+        os.mkdirs('./config/AutoQuickBackup')
     with open('./config/AutoQuickBackup/config.yml', 'w', encoding='UTF-8') as wf:
         yaml.dump(config, wf, default_flow_style=False, allow_unicode=True)
 
@@ -411,6 +407,7 @@ def enable(server, info):
         write()
     except:
         print_message(server, info, '§a修改§r保存失败')
+        return
     print_message(server, info, '§a修改§r成功')
     schedule_backup(server, info)
 
@@ -423,6 +420,7 @@ def disable(server, info):
         write()
     except:
         print_message(server, info, '§a修改§r保存失败')
+        return
     print_message(server, info, '§a修改§r成功')
 
 def interval(server, info, time):
@@ -435,6 +433,7 @@ def interval(server, info, time):
         write()
     except:
         print_message(server, info, '§a修改§r保存失败')
+        return
     print_message(server, info, '§a修改§r成功，将在下次自动存档后生效')
 
 def slot(server, info, slot):
@@ -447,6 +446,7 @@ def slot(server, info, slot):
         write()
     except:
         print_message(server, info, '§a修改§r保存失败')
+        return
     print_message(server, info, '§a修改§r成功')
 
 def on_info(server, info):
@@ -456,6 +456,7 @@ def on_info(server, info):
             game_saved = True
         return
 
+def on_user_info(server, info):
     command = info.content.split()
     if len(command) == 0 or command[0] != config['Prefix']:
         return
@@ -548,6 +549,7 @@ def on_load(server, old):
         restoring_backup = old.restoring_backup
     autosave = AutoSave(server)
     autosave.start()
+    read(server)
 
 
 def on_unload(server):
