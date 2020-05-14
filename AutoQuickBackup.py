@@ -457,7 +457,7 @@ def slot(server, info, slot):
 
 def on_info(server, info):
     if not info.is_user:
-        if info.content == 'Saved the game':
+        if info.content in ['Saved the game', 'Saved the world']:
             global game_saved
             game_saved = True
         return
