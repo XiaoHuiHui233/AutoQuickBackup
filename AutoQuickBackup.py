@@ -40,7 +40,7 @@ config = {
 }
 
 HelpMessage = '''
------- MCDR Auto Quick Backup 20200513 ------
+------ MCDR Auto Quick Backup 20200514 ------
 一个支持多槽位的自动快速§a备份§r&§c回档§r插件，由§eQuickBackupM§r插件改编而来
 §d【格式说明】§r
 §7{0}§r 显示帮助信息
