@@ -1,18 +1,22 @@
 # coding: utf8
+import copy
+import json
 import os
 import re
 import shutil
 import time
-from threading import Lock, Thread
-from utils.rtext import *
-from utils import constant, tool
-import ruamel.yaml as yaml
-import json
-import copy
 import traceback
+from threading import Lock, Thread
+from typing import *
 
+import ruamel.yaml as yaml
 
-'''默认配置项'''
+from utils import constant, tool
+from utils.info import Info
+from utils.rtext import *
+from utils.server_interface import ServerInterface
+
+# 默认配置项
 config = {
     'Enable': True,
     'Interval': 5,
@@ -42,7 +46,7 @@ config = {
 }
 
 HelpMessage = '''
------- MCDR Auto Quick Backup 20200514 ------
+------ MCDR Auto Quick Backup 20200622 ------
 一个支持多槽位的自动快速§a备份§r&§c回档§r插件，由§eQuickBackupM§r插件改编而来
 §d【格式说明】§r
 §7{0}§r 显示帮助信息
@@ -85,6 +89,7 @@ mcdr_root/
             config.yml
 '''
 
+
 def saveDefaultConfig():
     global config
     yaml_dict = {
@@ -118,10 +123,9 @@ def saveDefaultConfig():
     config = copy.deepcopy(yaml_dict)
 
 
-def read(server):
+def read(server: ServerInterface):
     global config
-    if not os.path.exists('./config/AutoQuickBackup'):
-        os.makedirs('./config/AutoQuickBackup')
+    os.makedirs('./config/AutoQuickBackup', exist_ok=True)
     if not os.path.exists('./config/AutoQuickBackup/config.yml'):
         saveDefaultConfig()
         return
@@ -131,14 +135,14 @@ def read(server):
         except yaml.YAMLError as exc:
             saveDefaultConfig()
 
-def write(server):
-    if not os.path.exists('./config/AutoQuickBackup'):
-        os.makedirs('./config/AutoQuickBackup')
+
+def write(server: ServerInterface):
+    os.makedirs('./config/AutoQuickBackup', exist_ok=True)
     with open('./config/AutoQuickBackup/config.yml', 'w', encoding='UTF-8') as wf:
         yaml.dump(config, wf, default_flow_style=False, allow_unicode=True)
 
 
-def print_message(server, info, msg, tell=True, prefix='[AQB] '):
+def print_message(server: ServerInterface, info, msg, tell=True, prefix='[AQB] '):
     msg = prefix + msg
     if info.is_player and not tell:
         server.say(msg)
@@ -150,38 +154,39 @@ def command_run(message, text, command):
     return RText(message).set_hover_text(text).set_click_event(RAction.run_command, command)
 
 
-def copy_worlds(src, dst):
+def copy_worlds(src: str, dst: str):
     def filter_ignore(path, files):
         return [file for file in files if file == 'session.lock' and config['IgnoreSessionLock']]
     for world in config['WorldNames']:
-        shutil.copytree('{}/{}'.format(src, world), '{}/{}'.format(dst, world), ignore=filter_ignore)
+        shutil.copytree('{}/{}'.format(src, world),
+                        '{}/{}'.format(dst, world), ignore=filter_ignore)
 
 
-def remove_worlds(folder):
+def remove_worlds(folder: str):
     for world in config['WorldNames']:
         shutil.rmtree('{}/{}'.format(folder, world))
 
 
-def get_slot_folder(slot):
+def get_slot_folder(slot: int) -> str:
     return '{}/slot{}'.format(config['BackupPath'], slot)
 
 
-def get_slot_info(slot):
+def get_slot_info(slot: int):
     try:
         with open('{}/info.json'.format(get_slot_folder(slot))) as f:
             info = json.load(f, encoding='utf8')
-        for key in info.keys():
-            value = info[key]
+        # for key in info.keys():
+        #     value = info[key]
     except:
         info = None
     return info
 
 
-def format_time():
+def format_time() -> str:
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 
 
-def format_slot_info(info_dict=None, slot_number=None):
+def format_slot_info(info_dict: Optional[dict] = None, slot_number: Optional[int] = None) -> Optional[str]:
     if type(info_dict) is dict:
         info = info_dict
     elif type(slot_number) is not None:
@@ -196,16 +201,12 @@ def format_slot_info(info_dict=None, slot_number=None):
 
 
 def touch_backup_folder():
-    def mkdir(path):
-        if not os.path.exists(path):
-            os.mkdir(path)
-
-    mkdir(config['BackupPath'])
+    os.makedirs(config['BackupPath'], exist_ok=True)
     for i in range(config['SlotCount']):
-        mkdir(get_slot_folder(i + 1))
+        os.makedirs(get_slot_folder(i + 1), exist_ok=True)
 
 
-def slot_number_formater(slot):
+def slot_number_formater(slot) -> Optional[int]:
     flag_fail = False
     if type(slot) is not int:
         try:
@@ -217,10 +218,11 @@ def slot_number_formater(slot):
     return slot
 
 
-def slot_check(server, info, slot):
+def slot_check(server: ServerInterface, info: Info, slot):
     slot = slot_number_formater(slot)
     if slot is None:
-        print_message(server, info, '槽位输入错误，应输入一个位于[{}, {}]的数字'.format(1, config['SlotCount']))
+        print_message(server, info, '槽位输入错误，应输入一个位于[{}, {}]的数字'.format(
+            1, config['SlotCount']))
         return None
 
     slot_info = get_slot_info(slot)
@@ -230,7 +232,7 @@ def slot_check(server, info, slot):
     return slot, slot_info
 
 
-def schedule_backup(server, info):
+def schedule_backup(server: ServerInterface, info: Info):
     global creating_backup
     acquired = creating_backup.acquire(blocking=False)
     if not acquired:
@@ -269,7 +271,8 @@ def schedule_backup(server, info):
         with open('{}/info.json'.format(slot_path), 'w') as f:
             json.dump(slot_info, f, indent=4)
         end_time = time.time()
-        print_message(server, info, '§a备份§r完成，耗时§6{}§r秒'.format(round(end_time - start_time, 1)))
+        print_message(server, info, '§a备份§r完成，耗时§6{}§r秒'.format(
+            round(end_time - start_time, 1)))
         print_message(server, info, format_slot_info(info_dict=slot_info))
     except Exception as e:
         print_message(server, info, '§a备份§r失败，错误代码{}'.format(e))
@@ -279,7 +282,7 @@ def schedule_backup(server, info):
             server.execute('save-on')
 
 
-def restore_backup(server, info, slot):
+def restore_backup(server: ServerInterface, info: Info, slot):
     ret = slot_check(server, info, slot)
     if ret is None:
         return
@@ -288,16 +291,19 @@ def restore_backup(server, info, slot):
     global slot_selected, abort_restore
     slot_selected = slot
     abort_restore = False
-    print_message(server, info, '准备将存档恢复至槽位§6{}§r， {}'.format(slot, format_slot_info(info_dict=slot_info)))
+    print_message(server, info, '准备将存档恢复至槽位§6{}§r， {}'.format(
+        slot, format_slot_info(info_dict=slot_info)))
     print_message(
         server, info,
-        command_run('使用§7{0} confirm§r 确认§c回档§r'.format(config['Prefix']), '点击确认', '{0} confirm'.format(config['Prefix']))
+        command_run('使用§7{0} confirm§r 确认§c回档§r'.format(
+            config['Prefix']), '点击确认', '{0} confirm'.format(config['Prefix']))
         + ', '
-        + command_run('§7{0} abort§r 取消'.format(config['Prefix']), '点击取消', '{0} abort'.format(config['Prefix']))
+        + command_run('§7{0} abort§r 取消'.format(
+            config['Prefix']), '点击取消', '{0} abort'.format(config['Prefix']))
     )
 
 
-def confirm_restore(server, info):
+def confirm_restore(server: ServerInterface, info: Info):
     global restoring_backup
     acquired = restoring_backup.acquire(blocking=False)
     if not acquired:
@@ -314,7 +320,8 @@ def confirm_restore(server, info):
         print_message(server, info, '10秒后关闭服务器§c回档§r')
         for countdown in range(1, 10):
             print_message(server, info, command_run(
-                '还有{}秒，将§c回档§r为槽位§6{}§r，{}'.format(10 - countdown, slot, format_slot_info(slot_number=slot)),
+                '还有{}秒，将§c回档§r为槽位§6{}§r，{}'.format(
+                    10 - countdown, slot, format_slot_info(slot_number=slot)),
                 '点击终止回档！',
                 '{} abort'.format(config['Prefix'])
             ))
@@ -330,13 +337,15 @@ def confirm_restore(server, info):
         server.wait_for_start()
 
         server.logger.info('[AQB] Backup current world to avoid idiot')
-        overwrite_backup_path = config['BackupPath'] + '/' + config['OverwriteBackupFolder']
+        overwrite_backup_path = config['BackupPath'] + \
+            '/' + config['OverwriteBackupFolder']
         if os.path.exists(overwrite_backup_path):
             shutil.rmtree(overwrite_backup_path)
         copy_worlds(config['ServerPath'], overwrite_backup_path)
         with open('{}/info.txt'.format(overwrite_backup_path), 'w') as f:
             f.write('Overwrite time: {}\n'.format(format_time()))
-            f.write('Confirmed by: {}'.format(info.player if info.is_player else '$Console$'))
+            f.write('Confirmed by: {}'.format(
+                info.player if info.is_player else '$Console$'))
 
         slot_folder = get_slot_folder(slot)
         server.logger.info('[AQB] Deleting world')
@@ -349,18 +358,19 @@ def confirm_restore(server, info):
         restoring_backup.release()
 
 
-def trigger_abort(server, info):
+def trigger_abort(server: ServerInterface, info: Info):
     global abort_restore, slot_selected
     abort_restore = True
     slot_selected = None
     print_message(server, info, '终止操作！')
 
 
-def list_backup(server, info, size_display=config['SizeDisplay']):
+def list_backup(server: ServerInterface, info: Info, size_display=config['SizeDisplay']):
     def get_dir_size(dir):
         size = 0
         for root, dirs, files in os.walk(dir):
-            size += sum([os.path.getsize(os.path.join(root, name)) for name in files])
+            size += sum([os.path.getsize(os.path.join(root, name))
+                         for name in files])
         if size < 2 ** 30:
             return f'{round(size / 2 ** 20, 2)} MB'
         else:
@@ -373,22 +383,26 @@ def list_backup(server, info, size_display=config['SizeDisplay']):
             server, info,
             RTextList(
                 f'[槽位§6{j}§r] ',
-                RText('[▷] ', color=RColor.green).h(f'点击回档至槽位§6{j}§r').c(RAction.run_command, f'{config["Prefix"]} back {j}'),
+                RText('[▷] ', color=RColor.green).h(f'点击回档至槽位§6{j}§r').c(
+                    RAction.run_command, f'{config["Prefix"]} back {j}'),
                 format_slot_info(slot_number=j)
             ),
             prefix=''
         )
     if size_display:
-        print_message(server, info, '备份总占用空间: §a{}§r'.format(get_dir_size(config['BackupPath'])), prefix='')
+        print_message(server, info, '备份总占用空间: §a{}§r'.format(
+            get_dir_size(config['BackupPath'])), prefix='')
 
 
-def print_help_message(server, info):
+def print_help_message(server: ServerInterface, info: Info):
     if info.is_player:
         server.reply(info, '')
     for line in HelpMessage.splitlines():
-        prefix = re.search(r'(?<=§7){}[\w ]*(?=§)'.format(config['Prefix']), line)
+        prefix = re.search(
+            r'(?<=§7){}[\w ]*(?=§)'.format(config['Prefix']), line)
         if prefix is not None:
-            print_message(server, info, RText(line).set_click_event(RAction.suggest_command, prefix.group()), prefix='')
+            print_message(server, info, RText(line).set_click_event(
+                RAction.suggest_command, prefix.group()), prefix='')
         else:
             print_message(server, info, line, prefix='')
     list_backup(server, info, size_display=False)
@@ -396,14 +410,14 @@ def print_help_message(server, info):
         server, info,
         '§d【快捷操作】§r' + '\n' +
         RText('>>> §c点我回档至最近的备份§r <<<')
-            .h('也就是回档至第一个槽位')
-            .c(RAction.suggest_command, f'{config["Prefix"]} back'),
+        .h('也就是回档至第一个槽位')
+        .c(RAction.suggest_command, f'{config["Prefix"]} back'),
         prefix=''
     )
 
 
-def enable(server, info):
-    if(config['Enable']):
+def enable(server: ServerInterface, info: Info):
+    if config['Enable']:
         print_message(server, info, '§a插件功能§r已经是打开的')
         return
     try:
@@ -411,12 +425,14 @@ def enable(server, info):
         write(server)
     except Exception as e:
         traceback.print_exc()
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
+        print_message(server, info, '§c修改§r保存失败.错误代码:' +
+                      traceback.format_exc())
         return
     print_message(server, info, '§a修改§r成功')
     schedule_backup(server, info)
 
-def disable(server, info):
+
+def disable(server: ServerInterface, info: Info):
     if not config['Enable']:
         print_message(server, info, '§a插件功能§r已经是关闭的')
         return
@@ -425,27 +441,32 @@ def disable(server, info):
         write(server)
     except Exception as e:
         traceback.print_exc()
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
+        print_message(server, info, '§c修改§r保存失败.错误代码:' +
+                      traceback.format_exc())
         return
     print_message(server, info, '§a修改§r成功')
 
-def interval(server, info, time):
+
+def interval(server: ServerInterface, info: Info, time):
     t = int(time)
-    if(t < 0 or t > 365 * 24 * 60):
-        print_message(server, info, '输入不合法，允许的区间是§a({}, {})'.format(0, 365 * 24 * 60))
+    if t < 0 or t > 365 * 24 * 60:
+        print_message(
+            server, info, '输入不合法，允许的区间是§a({}, {})'.format(0, 365 * 24 * 60))
         return
     try:
         config['Interval'] = t
         write(server)
     except Exception as e:
         traceback.print_exc()
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
+        print_message(server, info, '§c修改§r保存失败.错误代码:' +
+                      traceback.format_exc())
         return
     print_message(server, info, '§a修改§r成功，将在下次自动存档后生效')
 
+
 def slot(server, info, slot):
     slot_count = int(slot)
-    if(slot_count < 0 or slot_count > 100000):
+    if slot_count < 0 or slot_count > 100000:
         print_message(server, info, '输入不合法，允许的区间是§a(0, 100000)')
         return
     try:
@@ -453,22 +474,24 @@ def slot(server, info, slot):
         write(server)
     except Exception as e:
         traceback.print_exc()
-        print_message(server, info, '§c修改§r保存失败.错误代码:' + traceback.format_exc())
+        print_message(server, info, '§c修改§r保存失败.错误代码:' +
+                      traceback.format_exc())
         return
     print_message(server, info, '§a修改§r成功')
 
-def on_info(server, info):
+
+def on_info(server: ServerInterface, info: Info):
     if not info.is_user:
         if info.content in ['Saved the game', 'Saved the world']:
             global game_saved
             game_saved = True
         return
-    
-    if(tool.version_compare(constant.VERSION, '0.9.1-alpha') == -1):
+
+    if tool.version_compare(constant.VERSION, '0.9.1-alpha') == -1:
         on_user_info(server, info)
 
 
-def on_user_info(server, info):
+def on_user_info(server: ServerInterface, info: Info):
     command = info.content.split()
     if len(command) == 0 or command[0] != config['Prefix']:
         return
@@ -484,7 +507,7 @@ def on_user_info(server, info):
     # !!aqb
     if cmd_len == 1:
         print_help_message(server, info)
-    
+
     # !!aqb help
     elif cmd_len == 2 and command[1] == 'help':
         print_help_message(server, info)
@@ -492,7 +515,7 @@ def on_user_info(server, info):
     # !!aqb enable
     elif cmd_len == 2 and command[1] == 'enable':
         enable(server, info)
-    
+
     # !!aqb disable
     elif cmd_len == 2 and command[1] == 'disable':
         disable(server, info)
@@ -530,30 +553,35 @@ def on_user_info(server, info):
 
 
 class AutoSave(Thread):
-        def __init__(self, server):
-                Thread.__init__(self)
-                self.shutdown_flag = False
-                self.server = server
+    def __init__(self, server: ServerInterface):
+        Thread.__init__(self)
+        self.shutdown_flag = False
+        self.server = server
 
-        def run(self):
-                while(not self.shutdown_flag):
-                        time.sleep(60 * config['Interval'])
-                        if self.shutdown_flag:
-                                return
-                        if(config['Enable']):
-                                class Info():
-                                        def __init__(self):
-                                            self.isPlayer = False
-                                            self.is_player = False
-                                            self.player = '@a'
-                                info = Info()
-                                schedule_backup(self.server, info)
+    def run(self):
+        while not self.shutdown_flag:
+            time.sleep(60 * config['Interval'])
+            if self.shutdown_flag:
+                return
+            if config['Enable']:
+                class Info:
+                    def __init__(self):
+                        self.isPlayer = False
+                        self.is_player = False
+                        self.player = '@a'
+                info = Info()
+                schedule_backup(self.server, info)
 
-        def shutdown(self):
-                self.shutdown_flag = True
+    def shutdown(self):
+        self.shutdown_flag = True
 
-def on_load(server, old):
-    server.add_help_message(config['Prefix'], command_run('全自动§a备份§r/§c回档§r，§6{}§r槽位'.format(config['SlotCount']), '点击查看帮助信息', config['Prefix']))
+
+autosave: AutoSave
+
+
+def on_load(server: ServerInterface, old):
+    server.add_help_message(config['Prefix'], command_run(
+        '全自动§a备份§r/§c回档§r，§6{}§r槽位'.format(config['SlotCount']), '点击查看帮助信息', config['Prefix']))
     global creating_backup, restoring_backup, autosave
     if hasattr(old, 'creating_backup') and type(old.creating_backup) == type(creating_backup):
         creating_backup = old.creating_backup
