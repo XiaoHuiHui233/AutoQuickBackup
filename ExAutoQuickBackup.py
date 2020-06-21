@@ -4,9 +4,9 @@ import json
 import os
 import re
 import shutil
+from threading import Lock, Thread
 import time
 import traceback
-from threading import Lock, Thread
 from typing import *
 
 import ruamel.yaml as yaml
@@ -22,8 +22,8 @@ DEFAULT_CONFIG = {
     'Interval': 5,
     'SizeDisplay': True,
     'SlotCount': 5,
-    'Prefix': '!!aqb',
-    'BackupPath': './auto_qb_multi',
+    'Prefix': '!!eqb',
+    'BackupPath': './ex_auto_qb_multi',
     'TurnOffAutoSave': True,
     'IgnoreSessionLock': True,
     'WorldNames': [
@@ -47,7 +47,7 @@ DEFAULT_CONFIG = {
 config = copy.deepcopy(DEFAULT_CONFIG)
 
 HELP_MESSAGE = '''
------- MCDR Auto Quick Backup 20200622 ------
+------ MCDR Ex Auto Quick Backup 20200622 ------
 一个支持多槽位的自动快速§a备份§r&§c回档§r插件，由§eQuickBackupM§r插件改编而来
 §d【格式说明】§r
 §7{0}§r 显示帮助信息
@@ -75,7 +75,7 @@ mcdr_root/
     MCDReforged.py
     server/
         world/
-    auto_qb_multi/
+    ex_auto_qb_multi/
         slot1/
             info.json
             world/
@@ -86,10 +86,12 @@ mcdr_root/
             info.txt
             world/
     config/
-        AutoQuickBackup/
+        ExAutoQuickBackup/
             config.yml
 '''
 
+CONFIG_FILE_DIR = './config/ExAutoQuickBackup/'
+CONFIG_FILE_NAME = CONFIG_FILE_DIR + 'config.yml'
 
 class SlotInfo(TypedDict):
     time: str
@@ -98,7 +100,7 @@ class SlotInfo(TypedDict):
 
 def save_default_config():
     global config
-    with open('./config/AutoQuickBackup/config.yml', 'w', encoding='UTF-8') as wf:
+    with open(CONFIG_FILE_NAME, 'w', encoding='UTF-8') as wf:
         yaml.dump(DEFAULT_CONFIG, wf,
                   default_flow_style=False, allow_unicode=True)
     config = copy.deepcopy(DEFAULT_CONFIG)
@@ -106,11 +108,11 @@ def save_default_config():
 
 def read(server: ServerInterface):
     global config
-    os.makedirs('./config/AutoQuickBackup', exist_ok=True)
-    if not os.path.exists('./config/AutoQuickBackup/config.yml'):
+    os.makedirs(CONFIG_FILE_DIR, exist_ok=True)
+    if not os.path.exists(CONFIG_FILE_NAME):
         save_default_config()
         return
-    with open('./config/AutoQuickBackup/config.yml', 'r', encoding='UTF-8') as rf:
+    with open(CONFIG_FILE_NAME, 'r', encoding='UTF-8') as rf:
         try:
             config = yaml.safe_load(rf)
         except yaml.YAMLError as exc:
@@ -118,12 +120,12 @@ def read(server: ServerInterface):
 
 
 def write(server: ServerInterface):
-    os.makedirs('./config/AutoQuickBackup', exist_ok=True)
-    with open('./config/AutoQuickBackup/config.yml', 'w', encoding='UTF-8') as wf:
+    os.makedirs(CONFIG_FILE_DIR, exist_ok=True)
+    with open(CONFIG_FILE_NAME, 'w', encoding='UTF-8') as wf:
         yaml.dump(config, wf, default_flow_style=False, allow_unicode=True)
 
 
-def print_message(server: ServerInterface, info: Info, msg, tell=True, prefix='[AQB] '):
+def print_message(server: ServerInterface, info: Info, msg, tell=True, prefix='[EQB] '):
     msg = prefix + msg
     if info.is_player and not tell:
         server.say(msg)
@@ -314,10 +316,10 @@ def confirm_restore(server: ServerInterface, info: Info):
                     return
 
         server.stop()
-        server.logger.info('[AQB] Wait for server to stop')
+        server.logger.info('[EQB] Wait for server to stop')
         server.wait_for_start()
 
-        server.logger.info('[AQB] Backup current world to avoid idiot')
+        server.logger.info('[EQB] Backup current world to avoid idiot')
         overwrite_backup_path = config['BackupPath'] + \
             '/' + config['OverwriteBackupFolder']
         if os.path.exists(overwrite_backup_path):
@@ -329,9 +331,9 @@ def confirm_restore(server: ServerInterface, info: Info):
                 info.player if info.is_player else '$Console$'))
 
         slot_folder = get_slot_folder(slot)
-        server.logger.info('[AQB] Deleting world')
+        server.logger.info('[EQB] Deleting world')
         remove_worlds(config['ServerPath'])
-        server.logger.info('[AQB] Restore backup ' + slot_folder)
+        server.logger.info('[EQB] Restore backup ' + slot_folder)
         copy_worlds(slot_folder, config['ServerPath'])
 
         server.start()
@@ -476,43 +478,43 @@ def on_user_info(server: ServerInterface, info: Info):
             print_message(server, info, '§c权限不足！§r')
             return
 
-    # !!aqb
+    # !!eqb
     if cmd_len == 1:
         print_help_message(server, info)
 
-    # !!aqb help
+    # !!eqb help
     elif cmd_len == 2 and command[1] == 'help':
         print_help_message(server, info)
 
-    # !!aqb enable
+    # !!eqb enable
     elif cmd_len == 2 and command[1] == 'enable':
         enable(server, info)
 
-    # !!aqb disable
+    # !!eqb disable
     elif cmd_len == 2 and command[1] == 'disable':
         disable(server, info)
 
-    # !!aqb interval <minutes>
+    # !!eqb interval <minutes>
     elif cmd_len == 3 and command[1] == 'interval':
         interval(server, info, command[2])
 
-    # !!aqb slot <number>
+    # !!eqb slot <number>
     elif cmd_len == 3 and command[1] == 'slot':
         slot(server, info, command[2])
 
-    # !!aqb back [<slot>]
+    # !!eqb back [<slot>]
     elif cmd_len in [2, 3] and command[1] == 'back':
         restore_backup(server, info, command[2] if cmd_len == 3 else '1')
 
-    # !!aqb confirm
+    # !!eqb confirm
     elif cmd_len == 2 and command[1] == 'confirm':
         confirm_restore(server, info)
 
-    # !!aqb abort
+    # !!eqb abort
     elif cmd_len == 2 and command[1] == 'abort':
         trigger_abort(server, info)
 
-    # !!aqb list
+    # !!eqb list
     elif cmd_len == 2 and command[1] == 'list':
         list_backup(server, info)
 
