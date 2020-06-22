@@ -86,6 +86,7 @@ mcdr_root/
 '''
 
 def saveDefaultConfig():
+    global config
     yaml_dict = {
         'Enable': True,
         'Interval': 5,
@@ -118,6 +119,7 @@ def saveDefaultConfig():
 
 
 def read(server):
+    global config
     if not os.path.exists('./config/AutoQuickBackup'):
         os.makedirs('./config/AutoQuickBackup')
     if not os.path.exists('./config/AutoQuickBackup/config.yml'):
