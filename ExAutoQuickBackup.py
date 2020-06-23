@@ -1,16 +1,16 @@
-# coding: utf8
+# coding: UTF-8
 
+from collections import deque
 import copy
+from enum import Enum, auto
 import itertools
 import json
 import os
 import re
 import shutil
+from threading import Lock, Thread
 import time
 import traceback
-from collections import deque
-from enum import Enum, auto
-from threading import Lock, Thread
 from typing import *
 
 import ruamel.yaml as yaml
@@ -210,7 +210,7 @@ TIME_UNITS = {
     'Y': 365 * 24 * 60
 }
 TIME_REGEX = re.compile(
-    '^(\\d+(\\.\\d+)?)({})?$'.format('|'.join(TIME_UNITS.keys())), re.RegexFlag.IGNORECASE)
+    rf"^(\d+(\.\d*)?|\.\d+)({'|'.join(TIME_UNITS.keys())})?$", re.RegexFlag.IGNORECASE)
 
 
 def time_length_to_seconds(x: Union[int, float, str]) -> float:
@@ -272,7 +272,7 @@ def init_strategy(server: ServerInterface, info: Info):
     global strategy
     try:
         if config['Strategy'] not in STRATEGIES:
-            print_message(server, info, '策略\'{}\'不存在，此插件将被禁用')
+            print_message(server, info, '策略\'{}\'不存在, 此插件将被禁用')
             config['Strategy']
 
         strategy_factory = STRATEGIES[config['Strategy']]
@@ -282,7 +282,7 @@ def init_strategy(server: ServerInterface, info: Info):
         server.disable_plugin(os.path.basename(__file__)[:-3])
 
         traceback.print_exc()
-        print_message(server, info, '初始化策略失败，错误代码：' +
+        print_message(server, info, '初始化策略失败, 错误代码: ' +
                       traceback.format_exc())
 
         raise
@@ -296,13 +296,13 @@ def copy_worlds(src_folder: str, dst_folder: str):
     def filter_ignore(path, files):
         return [file for file in files if file == 'session.lock' and config['IgnoreSessionLock']]
     for world in config['WorldNames']:
-        shutil.copytree('{}/{}'.format(src_folder, world),
-                        '{}/{}'.format(dst_folder, world), ignore=filter_ignore)
+        shutil.copytree(os.path.join(src_folder, world),
+                        os.path.join(dst_folder, world), ignore=filter_ignore)
 
 
 def remove_worlds(folder: str):
     for world in config['WorldNames']:
-        shutil.rmtree('{}/{}'.format(folder, world))
+        shutil.rmtree(os.path.join(folder, world))
 
 # endregion
 
@@ -318,13 +318,13 @@ slots: Dict[int, SlotInfo] = {}
 
 
 def get_slot_folder(slot: int) -> str:
-    return '{}/slot{}'.format(config['BackupPath'], slot)
+    return os.path.join(config['BackupPath'], f'slot{slot}')
 
 
 def get_slot_info(slot: int) -> Optional[SlotInfo]:
     try:
-        with open('{}/info.json'.format(get_slot_folder(slot))) as f:
-            info = json.load(f, encoding='utf8')
+        with open(os.path.join(get_slot_folder(slot), 'info.json'), 'r', encoding='UTF-8') as f:
+            info = json.load(f, encoding='UTF-8')
         # for key in info.keys():
         #     value = info[key]
         return info
@@ -342,7 +342,7 @@ def format_slot_info(info_dict: Optional[SlotInfo] = None, slot_number: Optional
 
     if info is None:
         return None
-    msg = '日期: {}; 注释: {}'.format(info['time'], info.get('comment', '§7空§r'))
+    msg = f"日期: {info['time']}; 注释: {info.get('comment', '§7空§r')}"
     return msg
 
 
@@ -362,13 +362,13 @@ def slot_number_formatter(slot: Union[int, str]) -> Optional[int]:
 def slot_check(server: ServerInterface, info: Info, slot: Union[int, str]) -> Optional[Tuple[int, SlotInfo]]:
     slot_number = slot_number_formatter(slot)
     if slot_number is None:
-        print_message(server, info, '槽位输入错误，应输入一个位于[{}, {}]的数字'.format(
-            1, config['SlotCount']))
+        print_message(
+            server, info, f"槽位输入错误, 应输入一个位于[1, {config['SlotCount']}]的数字")
         return None
 
     slot_info = get_slot_info(slot_number)
     if slot_info is None:
-        print_message(server, info, '槽位输入错误，槽位§6{}§r为空'.format(slot_number))
+        print_message(server, info, f'槽位输入错误, 槽位§6{slot_number}§r为空')
         return None
     return slot_number, slot_info
 
@@ -383,7 +383,7 @@ def read_slots(server: ServerInterface, info: Info):
                 with open(os.path.join(folder, 'info.json'), 'r', encoding='UTF-8') as f:
                     slots[i] = json.load(f)
             except:
-                print_message(server, info, '读取槽位{}的信息失败'.format(i))
+                print_message(server, info, f'读取槽位{i}的信息失败')
 
 # endregion
 
@@ -394,7 +394,7 @@ def delete_backup(server: ServerInterface, info: Info, slot: Union[int, str]):
     acquired, other_task = active_task.register(TaskType.DELETE, [
                                                 TaskType.LIST, TaskType.SET_CONFIG], lambda: print_waiting(server, info))
     if not acquired:
-        print_message(server, info, '§4有未完成的{}任务，删除取消§r'.format(other_task))
+        print_message(server, info, f'§4有未完成的{other_task}任务, 删除取消§r')
         return
 
     try:
@@ -406,7 +406,7 @@ def delete_backup(server: ServerInterface, info: Info, slot: Union[int, str]):
     except Exception as e:
         traceback.print_exc()
         print_message(server, info, RText(
-            '§4删除失败§r，详细错误信息请查看服务端后台').set_hover_text(e), tell=False)
+            '§4删除失败§r, 详细错误信息请查看服务端后台').set_hover_text(e), tell=False)
     else:
         print_message(server, info, '§a删除完成§r', tell=False)
     finally:
@@ -431,18 +431,18 @@ def create_backup(server: ServerInterface, info: Info) -> Optional[SlotInfo]:
             if game_saved:
                 break
             if plugin_unloaded:
-                server.reply(info, '插件重载，§a备份§r中断！')
+                server.reply(info, '插件重载, §a备份§r中断!')
                 return None
 
         copy_worlds(config['ServerPath'], slot_path)
 
         slot_info = SlotInfo(time=format_time(), comment='自动保存')
-        with open('{}/info.json'.format(slot_path), 'w') as f:
+        with open(os.path.join(slot_path, 'info.json'), 'w') as f:
             json.dump(slot_info, f, indent=4)
 
         return slot_info
-    except Exception as e:
-        print_message(server, info, '§a备份§r失败，错误代码{}'.format(e))
+    except:
+        print_message(server, info, '§a备份§r失败, 错误代码: ' + traceback.format_exc())
         return None
     finally:
         if turn_off_auto_save:
@@ -499,8 +499,8 @@ def schedule_backup(server: ServerInterface, info: Info):
         slots[1] = slot_info
 
         end_time = time.time()
-        print_message(server, info, '§a备份§r完成，耗时§6{}§r秒'.format(
-            round(end_time - start_time, 1)))
+        print_message(
+            server, info, f'§a备份§r完成, 耗时§6{round(end_time - start_time, 1)}§r秒')
         print_message(server, info, format_slot_info(info_dict=slot_info))
     finally:
         active_task.unregister()
@@ -515,23 +515,23 @@ def restore_backup(server: ServerInterface, info: Info, slot_str: str):
     global slot_selected, abort_restore
     slot_selected = slot
     abort_restore = False
-    print_message(server, info, '准备将存档恢复至槽位§6{}§r， {}'.format(
-        slot, format_slot_info(info_dict=slot_info)))
+    print_message(
+        server, info, f'准备将存档恢复至槽位§6{slot}§r, {format_slot_info(info_dict=slot_info)}')
     print_message(
         server, info,
-        command_run('使用§7{0} confirm§r 确认§c回档§r'.format(
-            config['Prefix']), '点击确认', '{0} confirm'.format(config['Prefix']))
+        command_run(f"使用§7{config['Prefix']} confirm§r 确认§c回档§r",
+                    '点击确认', f"{config['Prefix']} confirm")
         + ', '
-        + command_run('§7{0} abort§r 取消'.format(
-            config['Prefix']), '点击取消', '{0} abort'.format(config['Prefix']))
+        + command_run(f"§7{config['Prefix']} abort§r 取消",
+                      '点击取消', f"{config['Prefix']} abort")
     )
 
 
 def confirm_restore(server: ServerInterface, info: Info):
-    acquired, current_task = active_task.register(
+    acquired, other_task = active_task.register(
         TaskType.RESTORE, [TaskType.LIST, TaskType.SET_CONFIG])
     if not acquired:
-        print_message(server, info, '正在{}，回档取消'.format(current_task))
+        print_message(server, info, f'有未完成的{other_task}任务, 回档取消')
         return
 
     try:
@@ -545,16 +545,15 @@ def confirm_restore(server: ServerInterface, info: Info):
         print_message(server, info, '10秒后关闭服务器§c回档§r')
         for countdown in range(1, 10):
             print_message(server, info, command_run(
-                '还有{}秒，将§c回档§r为槽位§6{}§r，{}'.format(
-                    10 - countdown, slot, format_slot_info(slot_number=slot)),
-                '点击终止回档！',
-                '{} abort'.format(config['Prefix'])
+                f'还有{10 - countdown}秒, 将§c回档§r为槽位§6{slot}§r, {format_slot_info(slot_number=slot)}',
+                '点击终止回档!',
+                f"{config['Prefix']} abort"
             ))
             for i in range(10):
                 time.sleep(0.1)
                 global abort_restore
                 if abort_restore:
-                    print_message(server, info, '§c回档§r被中断！')
+                    print_message(server, info, '§c回档§r被中断!')
                     return
 
         server.stop()
@@ -567,10 +566,10 @@ def confirm_restore(server: ServerInterface, info: Info):
         if os.path.exists(overwrite_backup_path):
             shutil.rmtree(overwrite_backup_path)
         copy_worlds(config['ServerPath'], overwrite_backup_path)
-        with open('{}/info.txt'.format(overwrite_backup_path), 'w') as f:
-            f.write('Overwrite time: {}\n'.format(format_time()))
-            f.write('Confirmed by: {}'.format(
-                info.player if info.is_player else '$Console$'))
+        with open(os.path.join(overwrite_backup_path, 'info.txt'), 'w') as f:
+            f.write(f'Overwrite time: {format_time()}\n')
+            f.write(
+                f"Confirmed by: {info.player if info.is_player else '$Console$'}")
 
         slot_folder = get_slot_folder(slot)
         server.logger.info('[EQB] Deleting world')
@@ -587,7 +586,7 @@ def trigger_abort(server: ServerInterface, info: Info):
     global abort_restore, slot_selected
     abort_restore = True
     slot_selected = None
-    print_message(server, info, '终止操作！')
+    print_message(server, info, '终止操作!')
 
 
 def list_backup(server: ServerInterface, info: Info, size_display=config['SizeDisplay']):
@@ -628,8 +627,8 @@ def list_backup(server: ServerInterface, info: Info, size_display=config['SizeDi
         if empty:
             print_message(server, info, '§b(当前无备份)§r', prefix='')
         elif size_display:
-            print_message(server, info, '备份总占用空间: §a{}§r'.format(
-                get_dir_size(config['BackupPath'])), prefix='')
+            print_message(
+                server, info, f"备份总占用空间: §a{get_dir_size(config['BackupPath'])}§r", prefix='')
     finally:
         active_task.unregister()
 
@@ -640,15 +639,15 @@ def list_backup(server: ServerInterface, info: Info, size_display=config['SizeDi
 
 HELP_MESSAGE = '''
 ------ MCDR Ex Auto Quick Backup 20200622 ------
-一个支持多槽位的自动快速§a备份§r&§c回档§r插件，由§eQuickBackupM§r插件改编而来
+一个支持多槽位的自动快速§a备份§r&§c回档§r插件, 由§eQuickBackupM§r插件改编而来
 §d【格式说明】§r
 §7{0}§r 显示帮助信息
 §7{0} help§r 显示帮助信息
-§7{0} enable§r 启用自动备份，会强制进行一次备份
+§7{0} enable§r 启用自动备份, 会强制进行一次备份
 §7{0} disable§r 关闭自动备份
 §7{0} slot §6<number>§r 调整槽位个数为 §6<number>§r 个
-注意，若输入 §6<number>§r 小于当前槽位，不会导致真实槽位数的减小
-减少的槽位仍在硬盘中存在，只是不会存在于列表中，也不会被新存档覆盖
+注意, 若输入 §6<number>§r 小于当前槽位, 不会导致真实槽位数的减小
+减少的槽位仍在硬盘中存在, 只是不会存在于列表中, 也不会被新存档覆盖
 §7{0} back §6[<slot>]§r §c回档§r为槽位§6<slot>§r的存档
 当§6<slot>§r未被指定时默认选择槽位§61§r
 §7{0} confirm§r 再次确认是否进行§c回档§r
@@ -663,7 +662,7 @@ def print_help_message(server: ServerInterface, info: Info):
         server.reply(info, '')
     for line in HELP_MESSAGE.format(config['Prefix']).splitlines():
         prefix = re.search(
-            r'(?<=§7){}[\w ]*(?=§)'.format(config['Prefix']), line)
+            rf"(?<=§7){config['Prefix']}[\w ]*(?=§)", line)
         if prefix is not None:
             print_message(server, info, RText(line).set_click_event(
                 RAction.suggest_command, prefix.group()), prefix='')
@@ -688,9 +687,9 @@ def set_config(server: ServerInterface, info: Info, key: str, value: Any, succes
     config[key] = value
     try:
         write_config()
-    except Exception as e:
+    except:
         traceback.print_exc()
-        print_message(server, info, '§c修改§r保存失败.错误代码:' +
+        print_message(server, info, '§c修改§r保存失败.错误代码: ' +
                       traceback.format_exc())
         print_message(server, info, '将重新读取配置')
         read_config()
@@ -721,7 +720,7 @@ def disable(server: ServerInterface, info: Info):
 def slot(server: ServerInterface, info: Info, slot: str):
     slot_count = int(slot)
     if not 1 <= slot_count <= 1000:
-        print_message(server, info, '输入不合法，允许的区间是§a[1, 1000]')
+        print_message(server, info, '输入不合法, 允许的区间是§a[1, 1000]')
         return
 
     set_config(server, info, 'SlotCount', slot_count)
@@ -778,7 +777,7 @@ def on_user_info(server: ServerInterface, info: Info):
     # MCDR permission check
     if cmd_len >= 2 and command[1] in config['MinimumPermissionLevel'].keys():
         if server.get_permission_level(info) < config['MinimumPermissionLevel'][command[1]]:
-            print_message(server, info, '§c权限不足！§r')
+            print_message(server, info, '§c权限不足!§r')
             return
 
     # !!eqb
@@ -823,7 +822,7 @@ def on_user_info(server: ServerInterface, info: Info):
 
     else:
         print_message(server, info, command_run(
-            '参数错误！请输入§7{}§r以获取插件信息'.format(config['Prefix']),
+            f"参数错误! 请输入§7{config['Prefix']}§r以获取插件信息",
             '点击查看帮助',
             config['Prefix']
         ))
@@ -832,7 +831,7 @@ def on_user_info(server: ServerInterface, info: Info):
 def on_load(server: ServerInterface, old):
     global active_task, autosave
     server.add_help_message(config['Prefix'], command_run(
-        '全自动§a备份§r/§c回档§r，§6{}§r槽位'.format(config['SlotCount']), '点击查看帮助信息', config['Prefix']))
+        f"全自动§a备份§r/§c回档§r, §6{config['SlotCount']}§r槽位", '点击查看帮助信息', config['Prefix']))
 
     if hasattr(old, 'active_task') and type(old.active_task) is type(active_task):
         active_task = old.active_task
