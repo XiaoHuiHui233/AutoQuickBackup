@@ -1,16 +1,16 @@
 # coding: UTF-8
 
-from collections import deque
 import copy
-from enum import Enum, auto
 import itertools
 import json
 import os
 import re
 import shutil
-from threading import Lock, Thread
 import time
 import traceback
+from collections import deque
+from enum import Enum, auto
+from threading import Lock, Thread
 from typing import *
 
 import ruamel.yaml as yaml
@@ -21,6 +21,11 @@ from utils.rtext import *
 from utils.server_interface import ServerInterface
 
 # region 杂项
+
+
+# 兼容
+if "TypedDict" not in globals():
+    globals()["TypedDict"] = dict
 
 
 class FakeInfo(NamedTuple):
@@ -221,7 +226,7 @@ def time_length_to_seconds(x: Union[int, float, str]) -> float:
         if not match:
             raise ValueError("Invalid string argument")
         multiplier = TIME_UNITS[match[3]] if match[3] is not None else 1
-        return float(match[1]) * multiplier * 60
+        return float(match[1]) * multiplier * 60.0
 
 # endregion
 
@@ -333,7 +338,7 @@ def get_slot_info(slot: int) -> Optional[SlotInfo]:
 
 
 def format_slot_info(info_dict: Optional[SlotInfo] = None, slot_number: Optional[int] = None) -> Optional[str]:
-    if type(info_dict) is dict:
+    if isinstance(info_dict, dict):  # 兼容
         info = info_dict
     elif type(slot_number) is int:
         info = get_slot_info(slot_number)
@@ -394,7 +399,7 @@ def delete_backup(server: ServerInterface, info: Info, slot: Union[int, str]):
     acquired, other_task = active_task.register(TaskType.DELETE, [
                                                 TaskType.LIST, TaskType.SET_CONFIG], lambda: print_waiting(server, info))
     if not acquired:
-        print_message(server, info, f'§4有未完成的{other_task}任务, 删除取消§r')
+        print_message(server, info, f'§4有未完成的§r{other_task}§4任务, 删除取消§r')
         return
 
     try:
@@ -443,7 +448,8 @@ def create_backup(server: ServerInterface, info: Info) -> Optional[SlotInfo]:
 
         return slot_info
     except:
-        print_message(server, info, '§a备份§r失败, 错误代码: ' + traceback.format_exc())
+        print_message(server, info, '§a备份§r失败, 错误代码: ' +
+                      traceback.format_exc())
         return None
     finally:
         if turn_off_auto_save:
@@ -532,7 +538,7 @@ def confirm_restore(server: ServerInterface, info: Info):
     acquired, other_task = active_task.register(
         TaskType.RESTORE, [TaskType.LIST, TaskType.SET_CONFIG])
     if not acquired:
-        print_message(server, info, f'有未完成的{other_task}任务, 回档取消')
+        print_message(server, info, f'§4有未完成的§r{other_task}§4任务, 回档取消§r')
         return
 
     try:
@@ -640,17 +646,18 @@ def list_backup(server: ServerInterface, info: Info, size_display=config['SizeDi
 
 HELP_MESSAGE = '''
 ------ MCDR Ex Auto Quick Backup 20200622 ------
-一个支持多槽位的自动快速§a备份§r&§c回档§r插件, 由§eQuickBackupM§r插件改编而来
+一个支持多槽位的自动快速§a备份§r&§c回档§r插件,
+由§eQuickBackupM§r和§eAutoQuickBackupM§r改编而来
 §d【命令说明】§r
 §7{0}§r               显示帮助信息
 §7{0} help§r          显示帮助信息
-§7{0} enable§r        启用自动备份, 会强制进行一次备份
+§7{0} enable§r        开启自动备份
 §7{0} disable§r       关闭自动备份
 §7{0} slot §6<number>§r 调整槽位个数为 §6<number>§r 个
-注意, 若输入 §6<number>§r 小于当前槽位, 不会导致真实槽位数的减少
-减少的槽位仍在硬盘中存在, 只是不会存在于列表中, 也不会被新存档覆盖
+    §o若输入 §6<number>§r§o 小于当前槽位, 不会导致真实槽位数减少
+    减少的槽位仍在硬盘中存在, 只是不会存在于列表中, 也不会被新存档覆盖§r
 §7{0} back §6[<slot>]§r §c回档§r为槽位§6<slot>§r的存档
-当§6<slot>§r未被指定时默认选择槽位§61§r
+    §o当§6<slot>§r未被指定时默认选择槽位§61§r
 §7{0} confirm§r       再次确认是否进行§c回档§r
 §7{0} abort§r         在任何时候键入此指令可中断§c回档§r
 §7{0} list§r          显示各槽位的存档信息
@@ -742,7 +749,7 @@ class AutoSave(Thread):
             time.sleep(strategy.interval())
             if self.shutdown_flag:
                 return
-            if config['Enable']:
+            if config['Enable'] and self.server.is_server_running():
                 info: Any = FakeInfo()
                 schedule_backup(self.server, info)
 
