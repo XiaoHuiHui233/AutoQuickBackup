@@ -354,7 +354,7 @@ def slot_number_formatter(slot: Union[int, str]) -> Optional[int]:
             slot_number = int(slot)
         except ValueError:
             return None
-    if not 1 <= slot <= config['SlotCount']:
+    if not 1 <= slot_number <= config['SlotCount']:
         return None
     return slot_number
 
@@ -403,6 +403,7 @@ def delete_backup(server: ServerInterface, info: Info, slot: Union[int, str]):
             return
         slot_number = ret[0]
         shutil.rmtree(get_slot_folder(slot_number))
+        del slots[slot_number]
     except Exception as e:
         traceback.print_exc()
         print_message(server, info, RText(
@@ -640,20 +641,20 @@ def list_backup(server: ServerInterface, info: Info, size_display=config['SizeDi
 HELP_MESSAGE = '''
 ------ MCDR Ex Auto Quick Backup 20200622 ------
 一个支持多槽位的自动快速§a备份§r&§c回档§r插件, 由§eQuickBackupM§r插件改编而来
-§d【格式说明】§r
-§7{0}§r 显示帮助信息
-§7{0} help§r 显示帮助信息
-§7{0} enable§r 启用自动备份, 会强制进行一次备份
-§7{0} disable§r 关闭自动备份
+§d【命令说明】§r
+§7{0}§r               显示帮助信息
+§7{0} help§r          显示帮助信息
+§7{0} enable§r        启用自动备份, 会强制进行一次备份
+§7{0} disable§r       关闭自动备份
 §7{0} slot §6<number>§r 调整槽位个数为 §6<number>§r 个
-注意, 若输入 §6<number>§r 小于当前槽位, 不会导致真实槽位数的减小
+注意, 若输入 §6<number>§r 小于当前槽位, 不会导致真实槽位数的减少
 减少的槽位仍在硬盘中存在, 只是不会存在于列表中, 也不会被新存档覆盖
 §7{0} back §6[<slot>]§r §c回档§r为槽位§6<slot>§r的存档
 当§6<slot>§r未被指定时默认选择槽位§61§r
-§7{0} confirm§r 再次确认是否进行§c回档§r
-§7{0} abort§r 在任何时候键入此指令可中断§c回档§r
-§7{0} list§r 显示各槽位的存档信息
-§7{0} del §6<slot>§r §c删除§r槽位§6<slot>§r的存档
+§7{0} confirm§r       再次确认是否进行§c回档§r
+§7{0} abort§r         在任何时候键入此指令可中断§c回档§r
+§7{0} list§r          显示各槽位的存档信息
+§7{0} del §6<slot>§r    §c删除§r槽位§6<slot>§r的存档
 '''.strip()
 
 
