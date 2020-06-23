@@ -73,6 +73,11 @@ mcd_root/
 
 ExAutoQuickBackup 会在 MCDR 的 `config` 文件夹下生成 `YAML` 格式的配置文件 `ex_auto_quick_backup.yml`，可以通过修改此文件来配置插件。
 
+若需要在运行 MCDR 前配置好此插件，可以在 **MCDR 根目录** 中使用如下命令生成配置文件：
+```bash
+python plugins/ExAutoQuickBackup.py create_config
+```
+
 *相比于 `AutoQuickBackup`，删去了 `Interval` 而增加了 `Strategy` 和 `StrategyConfig`。*
 
 #### Strategy 和 StrategyConfig

@@ -1,16 +1,17 @@
 # coding: UTF-8
 
+from collections import deque
 import copy
+from enum import Enum, auto
 import itertools
 import json
 import os
 import re
 import shutil
+import sys
+from threading import Lock, Thread
 import time
 import traceback
-from collections import deque
-from enum import Enum, auto
-from threading import Lock, Thread
 from typing import *
 
 import ruamel.yaml as yaml
@@ -860,3 +861,8 @@ def on_unload(server: ServerInterface):
     autosave.shutdown()
 
 # endregion
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == 'create_config':
+        print(f'生成配置文件 {CONFIG_FILE_NAME}...', file=sys.stderr)
+        save_default_config()
