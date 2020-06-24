@@ -1,17 +1,17 @@
 # coding: UTF-8
 
-from collections import deque
 import copy
-from enum import Enum, auto
 import itertools
 import json
 import os
 import re
 import shutil
 import sys
-from threading import Lock, Thread
 import time
 import traceback
+from collections import deque
+from enum import Enum, auto
+from threading import Lock, Thread
 from typing import *
 
 import ruamel.yaml as yaml
@@ -535,6 +535,47 @@ def restore_backup(server: ServerInterface, info: Info, slot_str: str):
     )
 
 
+def wait_for_cancel_text(server: ServerInterface, info: Info, slot: int) -> bool:
+    for countdown in range(9, -1, -1):
+        print_message(server, info, command_run(
+            f'还有{countdown}秒, 将§c回档§r为槽位§6{slot}§r, {format_slot_info(slot_number=slot)}',
+            '点击终止回档!',
+            f"{config['Prefix']} abort"
+        ), tell=False)
+        for i in range(10):
+            time.sleep(0.1)
+            global abort_restore
+            if abort_restore:
+                print_message(server, info, '§c回档§r被中断！', tell=False)
+                return False
+    return True
+
+
+def wait_for_cancel_with_progress_bar(server: ServerInterface, info: Info, slot: int) -> bool:
+    progress_bar_instance = server.get_plugin_instance('ProgressBar.py')
+    print_message(server, info, command_run(
+        f'即将§c回档§r为槽位§6{slot}§r, {format_slot_info(slot_number=slot)}',
+        '点击终止回档!',
+        f"{config['Prefix']} abort"
+    ), tell=False)
+    progress_bar = progress_bar_instance.Bar('§c§l10§r秒后关闭服务器§c回档§r') \
+        .style(progress_bar_instance.BarStyle.NOTCHED_10) \
+        .color(progress_bar_instance.BarColor.RED) \
+        .value(100) \
+        .show('@a')
+    for countdown in range(9, -1, -1):
+        progress_bar.text(f'§c§l{countdown}§r秒后关闭服务器§c回档§r')
+        for i in range(10, 0, -1):
+            time.sleep(0.1)
+            progress_bar.value(countdown * 10 + i)
+            global abort_restore
+            if abort_restore:
+                print_message(server, info, '§c回档§r被中断！', tell=False)
+                progress_bar.delete()
+                return False
+    progress_bar.delete()
+    return True
+
 def confirm_restore(server: ServerInterface, info: Info):
     acquired, other_task = active_task.register(
         TaskType.RESTORE, [TaskType.LIST, TaskType.SET_CONFIG])
@@ -551,18 +592,10 @@ def confirm_restore(server: ServerInterface, info: Info):
         slot_selected = None
 
         print_message(server, info, '10秒后关闭服务器§c回档§r')
-        for countdown in range(1, 10):
-            print_message(server, info, command_run(
-                f'还有{10 - countdown}秒, 将§c回档§r为槽位§6{slot}§r, {format_slot_info(slot_number=slot)}',
-                '点击终止回档!',
-                f"{config['Prefix']} abort"
-            ))
-            for i in range(10):
-                time.sleep(0.1)
-                global abort_restore
-                if abort_restore:
-                    print_message(server, info, '§c回档§r被中断!')
-                    return
+
+        wait_for_cancel = wait_for_cancel_with_progress_bar if server.get_plugin_instance('ProgressBar.py') is not None else wait_for_cancel_text
+        if not wait_for_cancel(server, info, slot):
+            return
 
         server.stop()
         server.logger.info('[EQB] Wait for server to stop')
