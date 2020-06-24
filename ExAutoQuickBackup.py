@@ -485,14 +485,43 @@ def delete_backup(server: ServerInterface, info: Info, slot: Union[int, str]):
         active_task.unregister()
 
 
-def create_backup(server: ServerInterface, info: Info) -> Optional[SlotInfo]:
+class BackupBar:
+    def __init__(self, server: ServerInterface, steps: List[str]):
+        self.steps = steps
+
+        progress_bar_instance = server.get_plugin_instance('ProgressBar.py')
+        self.enabled = progress_bar_instance is not None
+
+        if self.enabled:
+            self.current_step = 0
+            try:
+                self.bar = progress_bar_instance.Bar(steps[0]) \
+                    .max(len(self.steps) - 1) \
+                    .value(1) \
+                    .style(progress_bar_instance.BarStyle.NOTCHED_10) \
+                    .color(progress_bar_instance.BarColor.GREEN) \
+                    .show('@a')
+            except:
+                # 服务器开启时可能会失败？
+                self.enabled = False
+
+    def step(self):
+        if self.enabled:
+            self.current_step += 1
+            if self.current_step < len(self.steps):
+                self.bar.text(self.steps[self.current_step])
+                self.bar.value(self.current_step + 1)
+
+    def delete(self):
+        if self.enabled:
+            self.bar.delete()
+
+
+def create_backup(server: ServerInterface, info: Info, bar: BackupBar) -> Optional[SlotInfo]:
     '''仅负责备份到 1 号槽位，不负责管理其他备份。'''
     turn_off_auto_save = config['TurnOffAutoSave']
     slot_path = get_slot_folder(1)
     try:
-        os.makedirs(slot_path, exist_ok=True)
-
-        # start backup
         global game_saved, plugin_unloaded
         game_saved = False
         if turn_off_auto_save:
@@ -506,11 +535,18 @@ def create_backup(server: ServerInterface, info: Info) -> Optional[SlotInfo]:
                 server.reply(info, '插件重载, §a备份§r中断!')
                 return None
 
+        bar.step()
+
+        os.makedirs(slot_path, exist_ok=True)
         copy_worlds(config['ServerPath'], slot_path)
+
+        bar.step()
 
         slot_info = SlotInfo(time=format_time(), comment='自动保存')
         with open(os.path.join(slot_path, 'info.json'), 'w') as f:
             json.dump(slot_info, f, indent=4)
+
+        bar.step()
 
         return slot_info
     except:
@@ -537,8 +573,14 @@ def schedule_backup(server: ServerInterface, info: Info):
                                        TaskType.BACKUP, TaskType.RESTORE, TaskType.DELETE, TaskType.LIST, TaskType.SET_CONFIG])
     assert acquired
 
-    print_message(server, info, '§a备份§r中...请稍等')
+    print_message(server, info, '自动§a备份§r中...请稍等')
     start_time = time.time()
+    bar = BackupBar(server, [
+        '自动备份: 移动其他槽位中...(1/4)',
+        '自动备份: 保存游戏中...(2/4)',
+        '自动备份: 拷贝存档中...(3/4)',
+        '自动备份: 记录槽位信息中...(4/4)'
+    ])
 
     try:
         ages, indices = get_slot_ages()
@@ -564,7 +606,9 @@ def schedule_backup(server: ServerInterface, info: Info):
             slots[i] = slots[i - 1]
             del slots[i - 1]
 
-        slot_info = create_backup(server, info)
+        bar.step()
+
+        slot_info = create_backup(server, info, bar)
 
         if slot_info is None:
             return
@@ -576,6 +620,7 @@ def schedule_backup(server: ServerInterface, info: Info):
             server, info, f'§a备份§r完成, 耗时§6{round(end_time - start_time, 1)}§r秒')
         print_message(server, info, format_slot_info(info_dict=slot_info))
     finally:
+        bar.delete()
         active_task.unregister()
 
 
