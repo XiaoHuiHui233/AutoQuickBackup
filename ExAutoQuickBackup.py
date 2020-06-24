@@ -225,7 +225,7 @@ def time_length_to_seconds(x: Union[int, float, str]) -> float:
     else:
         match = re.match(TIME_REGEX, x)
         if not match:
-            raise ValueError("Invalid string argument")
+            raise ValueError("Invalid string argument", x)
         multiplier = TIME_UNITS[match[3]] if match[3] is not None else 1
         return float(match[1]) * multiplier * 60.0
 
@@ -242,34 +242,99 @@ class Strategy:
         return NotImplemented
 
 
-class DefaultStrategy(Strategy):
+class TimeListStrategy(Strategy):
     EPS = 10
 
     def __init__(self, server: ServerInterface, config: List[Union[int, float, str]]):
+        def error(msg: str):
+            info: Any = FakeInfo()
+            print_message(server, info, msg)
+
+        if not config:
+            error('§4StrategyConfig 为空§r')
+            return
+        if not all(type(t) in [int, float, str] for t in config):
+            error('§4StrategyConfig 格式不正确§r')
+            return
+
         try:
             self.config = sorted(map(time_length_to_seconds, config))
-        except ValueError:
-            pass
+        except ValueError as exc:
+            error(f'§4策略初始化失败: \'{exc.args[1]}\' 不是有效的时间长度§r')
 
     def interval(self) -> float:
         return self.config[0]
 
+
+class DefaultStrategy(TimeListStrategy):
     def decide_which_to_keep(self, ages: List[float]) -> List[bool]:
         result = [True] * len(ages)
 
         if len(ages) < len(self.config):
             return result
 
-        for i in range(len(self.config) - 1):
-            if ages[i + 1] + DefaultStrategy.EPS < self.config[i + 1]:
-                result[i] = False
+        for i in range(1, len(self.config)):
+            if ages[i] + TimeListStrategy.EPS < self.config[i]:
+                result[i - 1] = False
                 return result
 
         return result
 
 
+class DenseStrategy(TimeListStrategy):
+    def decide_which_to_keep(self, ages: List[float]) -> List[bool]:
+        if ages[-1] + TimeListStrategy.EPS < self.config[0]:
+            return [False] * (len(ages) - 1) + [True]
+
+        def less_than_config(index: int):
+            if index == len(self.config):
+                def pred(ages_index: int):
+                    return ages_index < len(ages)
+                return pred
+
+            def pred(ages_index: int):
+                return ages_index < len(ages) and ages[ages_index] + TimeListStrategy.EPS < self.config[index]
+            return pred
+
+        index_processed = next(itertools.dropwhile(
+            less_than_config(0), itertools.count(0)))
+        # [0, index_processed) 的 age 小于 config[0]
+        result = [False] * index_processed
+        kept_exists = False
+        for i in range(len(self.config)):
+            index_to_process = next(itertools.dropwhile(
+                less_than_config(i + 1), itertools.count(index_processed)))
+            # [index_processed, index_to_process) 的 age 在 config[i] 和 config[i + 1] 之间
+
+            if index_to_process != index_processed:
+                result += [True] * (index_to_process - index_processed)
+
+                period_length = self.config[i]
+                last_kept = index_to_process - 1
+                for j in range(last_kept - 1, index_processed - 1, -1):
+                    interval_this = ages[last_kept] - ages[j]
+                    if j > index_processed or kept_exists:
+                        # j > 0
+                        interval_next = ages[last_kept] - ages[j - 1]
+                        do_keep = abs(
+                            period_length - interval_this) < abs(period_length - interval_next)
+                    else:
+                        do_keep = interval_this > period_length / 2
+
+                    if do_keep:
+                        last_kept = j
+                    else:
+                        result[j] = False
+
+                index_processed = index_to_process
+                kept_exists = True
+
+        return result
+
+
 STRATEGIES: Dict[str, Callable[[ServerInterface, Any], Strategy]] = {
-    'default': DefaultStrategy
+    'default': DefaultStrategy,
+    'dense': DenseStrategy
 }
 strategy: Strategy
 
@@ -389,7 +454,7 @@ def read_slots(server: ServerInterface, info: Info):
                 with open(os.path.join(folder, 'info.json'), 'r', encoding='UTF-8') as f:
                     slots[i] = json.load(f)
             except:
-                print_message(server, info, f'读取槽位{i}的信息失败')
+                print_message(server, info, f'读取槽位§6{i}§r的信息失败')
 
 # endregion
 
@@ -576,6 +641,7 @@ def wait_for_cancel_with_progress_bar(server: ServerInterface, info: Info, slot:
     progress_bar.delete()
     return True
 
+
 def confirm_restore(server: ServerInterface, info: Info):
     acquired, other_task = active_task.register(
         TaskType.RESTORE, [TaskType.LIST, TaskType.SET_CONFIG])
@@ -593,7 +659,8 @@ def confirm_restore(server: ServerInterface, info: Info):
 
         print_message(server, info, '10秒后关闭服务器§c回档§r')
 
-        wait_for_cancel = wait_for_cancel_with_progress_bar if server.get_plugin_instance('ProgressBar.py') is not None else wait_for_cancel_text
+        wait_for_cancel = wait_for_cancel_with_progress_bar if server.get_plugin_instance(
+            'ProgressBar.py') is not None else wait_for_cancel_text
         if not wait_for_cancel(server, info, slot):
             return
 
@@ -721,7 +788,7 @@ def print_help_message(server: ServerInterface, info: Info):
     )
 
 
-def set_config(server: ServerInterface, info: Info, key: str, value: Any, success_feedback='§a修改§r成功') -> bool:
+def set_config(server: ServerInterface, info: Info, key: str, value: Any, success_feedback='§a修改§r成功', on_success: Callable[[], Any] = (lambda: ())) -> bool:
     acquired, _ = active_task.register(TaskType.SET_CONFIG, [
                                        TaskType.BACKUP, TaskType.RESTORE, TaskType.DELETE, TaskType.LIST, TaskType.SET_CONFIG], lambda: print_waiting(server, info))
     assert acquired
@@ -737,6 +804,7 @@ def set_config(server: ServerInterface, info: Info, key: str, value: Any, succes
         read_config()
         return False
     else:
+        on_success()
         print_message(server, info, success_feedback)
         return True
     finally:
@@ -765,7 +833,8 @@ def slot(server: ServerInterface, info: Info, slot: str):
         print_message(server, info, '输入不合法, 允许的区间是§a[1, 1000]')
         return
 
-    set_config(server, info, 'SlotCount', slot_count)
+    set_config(server, info, 'SlotCount', slot_count,
+               on_success=lambda: read_slots(server, info))
 
 # endregion
 
@@ -894,6 +963,7 @@ def on_unload(server: ServerInterface):
     autosave.shutdown()
 
 # endregion
+
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'create_config':
