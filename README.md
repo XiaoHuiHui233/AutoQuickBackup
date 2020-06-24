@@ -3,10 +3,13 @@
 
 一个支持多槽位自动快速备份和回档的 MCDR 插件，能够灵活安排备份存留的时长，使得需回档时不同量级的时间之前的备份都有保留。具体的存留策略可配置，亦可根据需求写代码扩展。
 
+在默认配置下，`ExAutoQuickBackup` 大致会在 10 分钟、1 小时、3 小时、1 天、2 天、3 天、5 天、10 天、1 个月和 2 个月内各保留一个备份。具体设置见[后文](#strategy-和-strategyconfig)。
+
 此插件由由 [QuickBackupM](https://github.com/TISUnion/QuickBackupM) 改编而来的 [AutoQuickBackup](https://github.com/XiaoHuiHui233/AutoQuickBackup) 改编而来。相比于 AutoQuickBackup 和 / 或 QuickBackupM，ExAutoQuickBackup 除上述特点外，还
 - 能够删除备份槽位。
 - 在备份时中间有空槽位的情况下不会删除最后一个槽位。
 - 尝试通过同一时间只允许进行一个操作提高安全性，如自动备份会等待删除存档完成等。
+- 在安装的情况下，利用 [ProgressBar](https://github.com/Preliterate/ProgressBar) 插件显示进度条。部分代码来源于 [ProgressBar 作者本人的实现](https://github.com/Preliterate/QuickBackupM-PB)。
 
 *同 QuickBackupM 和 AutoQuickBackup，仅支持全量备份，暂不支持压缩。*
 
@@ -16,6 +19,8 @@
   - `0.8.2-alpha` 以上。
 - [Python](https://python.org)
   - `3.8`，但向后兼容 `3.6`。如果 `3.8` 之前的版本出现了兼容性问题，请提 [issue](https://github.com/TRCYX/AutoQuickBackup/issues/new)。
+- [ProgressBar](https://github.com/Preliterate/ProgressBar)
+  - 可选
 
 ## 使用方法
 
@@ -100,11 +105,11 @@ StrategyConfig:
 - 2M
 ```
 
-所有策略的列表如下（目前只有默认策略 `default`）：
+目前所有策略的列表如下：
 
 ##### default
 
-`StrategyConfig` 为一时长列表，此策略尝试对于每相邻两个时长，在距当前这两个时长所表示的时间段内保留一个存档。备份周期为列表中最小的时间。如在其为默认值
+`StrategyConfig` 为一时长列表，此策略尝试对于每相邻两个时长，在距当前这两个时长所表示的时间段内保留一个备份。备份周期为列表中最小的时间。如在其为默认值
 ```
 [10min, 1h, 3h, 1d, 2d, 3d, 5d, 10d, 1M, 2M]
 ```
@@ -118,9 +123,19 @@ StrategyConfig:
 | M | 月（30天） |
 | Y | 年（365天） |
 
-注意距当前不同时间段的存档的分配不是完全精准的，但大致会与设置相符合。如果每个时间段的长度是前一个时间段长度的倍数，那么 `default` 策略能够精准地让每个时间段内各有一个备份。
+注意距当前不同时间段的存档的分配不是完全精准的，但大致会与设置相符合。如果每个时间段的长度是前一个时间段长度的倍数，那么 `default` 策略能够较精准地让每个时间段内各有一个备份。
 
 另外，如果槽位总数大于时长列表长度，`default` 策略会大致以最后一段时间的长度为周期存留更老的备份，如默认情况下此周期为 `2M - 1M = 1M`。如果槽位被填满，编号最大的（理应为最老的）槽位会被删除。
+
+##### dense
+
+与 `default` 策略相同，`StrategyConfig` 也为一时长列表，备份周期也为列表中最小的时间。不过 `dense` 策略在每相邻两个时长间的时间段内尝试以两者中较小的时长为周期保留备份。如 `StrategyConfig` 为
+```
+[10min, 1h, 3h, 1d, 10d, 2M]
+```
+的情况下，距当前 1 小时内会每 10 分钟保存一个备份，1 小时至 3 小时内会每 1 小时保存一个备份，3 小时至 1 天内会每 3 小时保持一个备份，依此类推。若槽位足够多，多余的槽位会以最大的时长为周期保留备份，如在例子中每两个月会保留一个备份。
+
+同样，这种分配并不是完全精确的。如果每个时长是前一个时长的倍数，`dense` 策略能够较精准地保持希望得到的备份分布。
 
 **通过代码增加其他策略的方法详见[后文](#增加其他策略)。**
 
@@ -220,7 +235,7 @@ class Strategy:
 
 `interval` 方法返回自动备份的周期，**以秒为单位**，如 `default` 策略返回 `StrategyConfig` 中的最小者。程序中 `time_length_to_seconds` 函数可以将以分钟为单位的时间或者带单位的字符串转化为以秒为单位。
 
-`decide_which_to_keep` 方法接受一个 `float` 列表 `ages`，为所有现存备份已存在的时长，从小到大排列，以秒为单位。此方法需要返回一个等长的 `bool` 列表，按同于 `ages` 的顺序表示每个备份是否保留（`True` 为保留）。*如果返回值全为 `True` 且槽位已经填满，编号最大的槽位则会被强制删除。*
+`decide_which_to_keep` 方法接受一个 `float` 列表 `ages`，为所有现存备份已存在的时长，从小到大排列，以秒为单位。此方法需要返回一个等长的 `bool` 列表，按同于 `ages` 的顺序表示每个备份是否保留（`True` 为保留）。*如果返回值全为 `True` 且槽位已经填满，编号最大的槽位则会被强制删除。请不要修改传入的 `ages`。*
 
 在实现了新的策略后，将其以 `<名称>: <类名 / 构造函数名>` 的形式加入程序中的 `STRATEGIES` 字典，即可在配置文件中以 `<名称>` 调用。
 
