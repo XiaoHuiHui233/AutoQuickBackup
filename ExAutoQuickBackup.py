@@ -518,7 +518,8 @@ class BackupBar:
 
                 current_time = time.time()
                 if current_time - last_update < BackupBar.MIN_UPDATE_TIME:
-                    time.sleep(BackupBar.MIN_UPDATE_TIME - (current_time - last_update))
+                    time.sleep(BackupBar.MIN_UPDATE_TIME -
+                               (current_time - last_update))
 
                 if delete:
                     break
@@ -1008,8 +1009,6 @@ def on_user_info(server: ServerInterface, info: Info):
 
 def on_load(server: ServerInterface, old):
     global active_task, autosave
-    server.add_help_message(config['Prefix'], command_run(
-        f"全自动§a备份§r/§c回档§r, §6{config['SlotCount']}§r槽位", '点击查看帮助信息', config['Prefix']))
 
     if hasattr(old, 'active_task') and type(old.active_task) is type(active_task):
         active_task = old.active_task
@@ -1021,6 +1020,9 @@ def on_load(server: ServerInterface, old):
 
     autosave = AutoSave(server)
     autosave.start()
+
+    server.add_help_message(config['Prefix'], command_run(
+        f"全自动§a备份§r/§c回档§r, §6{config['SlotCount']}§r槽位", '点击查看帮助信息', config['Prefix']))
 
 
 def on_unload(server: ServerInterface):
