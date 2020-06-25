@@ -553,7 +553,6 @@ class AutoSave(Thread):
                 self.shutdown_flag = True
 
 def on_load(server, old):
-    server.add_help_message(config['Prefix'], command_run('全自动§a备份§r/§c回档§r，§6{}§r槽位'.format(config['SlotCount']), '点击查看帮助信息', config['Prefix']))
     global creating_backup, restoring_backup, autosave
     if hasattr(old, 'creating_backup') and type(old.creating_backup) == type(creating_backup):
         creating_backup = old.creating_backup
@@ -563,6 +562,7 @@ def on_load(server, old):
     autosave.start()
     read(server)
 
+    server.add_help_message(config['Prefix'], command_run('全自动§a备份§r/§c回档§r，§6{}§r槽位'.format(config['SlotCount']), '点击查看帮助信息', config['Prefix']))
 
 def on_unload(server):
     global abort_restore, plugin_unloaded
