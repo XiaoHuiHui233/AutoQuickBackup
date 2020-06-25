@@ -4,6 +4,7 @@ import copy
 import itertools
 import json
 import os
+import queue
 import re
 import shutil
 import sys
@@ -486,35 +487,56 @@ def delete_backup(server: ServerInterface, info: Info, slot: Union[int, str]):
 
 
 class BackupBar:
+    MIN_UPDATE_TIME = 0.5
+
     def __init__(self, server: ServerInterface, steps: List[str]):
         self.steps = steps
 
         progress_bar_instance = server.get_plugin_instance('ProgressBar.py')
-        self.enabled = progress_bar_instance is not None
-
-        if self.enabled:
+        if progress_bar_instance is not None:
             self.current_step = 0
             try:
                 self.bar = progress_bar_instance.Bar(steps[0]) \
-                    .max(len(self.steps) - 1) \
+                    .max(len(self.steps)) \
                     .value(1) \
                     .style(progress_bar_instance.BarStyle.NOTCHED_10) \
                     .color(progress_bar_instance.BarColor.GREEN) \
                     .show('@a')
-            except:
+                self.queue: queue.Queue[bool] = queue.Queue()
+                self.thread = Thread(target=self.thread_proc)
+                self.thread.start()
+            except Exception as e:
+                traceback.print_exc()
                 # 服务器开启时可能会失败？
-                self.enabled = False
+                pass
+
+    def thread_proc(self):
+        try:
+            last_update = time.time()
+            while True:
+                delete = self.queue.get()
+
+                current_time = time.time()
+                if current_time - last_update < BackupBar.MIN_UPDATE_TIME:
+                    time.sleep(BackupBar.MIN_UPDATE_TIME - (current_time - last_update))
+
+                if delete:
+                    break
+
+                self.current_step += 1
+                if self.current_step < len(self.steps):
+                    self.bar.text(self.steps[self.current_step])
+                    self.bar.value(self.current_step + 1)
+
+                last_update = current_time
+        finally:
+            self.bar.delete()
 
     def step(self):
-        if self.enabled:
-            self.current_step += 1
-            if self.current_step < len(self.steps):
-                self.bar.text(self.steps[self.current_step])
-                self.bar.value(self.current_step + 1)
+        self.queue.put(False)
 
     def delete(self):
-        if self.enabled:
-            self.bar.delete()
+        self.queue.put(True)
 
 
 def create_backup(server: ServerInterface, info: Info, bar: BackupBar) -> Optional[SlotInfo]:
