@@ -261,6 +261,9 @@ def schedule_backup(server, info):
             if plugin_unloaded:
                 server.reply(info, '插件重载，§a备份§r中断！')
                 return
+            if not server.is_server_running():
+                server.reply(info, '服务器关闭，§a备份§r中断!')
+                return None
         slot_path = get_slot_folder(1)
 
         copy_worlds(config['ServerPath'], slot_path)
