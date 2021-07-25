@@ -4,8 +4,8 @@ import re
 import shutil
 import time
 from threading import Lock, Thread
-from utils.rtext import *
-from utils import constant, tool
+from mcdreforged.api.rtext import *
+from mcdreforged import *
 import ruamel.yaml as yaml
 import json
 import copy
