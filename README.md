@@ -1,3 +1,9 @@
+## 本插件仅支持MCDR v0.8.2 - 0.9.7，并不会提供v1.0+的支持，请使用更高版本MCDR的用户自动忽略本插件
+
+AutoQuickBackup是从QuickBackupM代码小部分魔改得到的，在线程安全上（尤指游戏中的save的保护）存在一些问题。  
+目前[Fallen-Breath](https://github.com/Fallen-Breath)已经开发了TimedQBM插件对QuickBackupM进行扩展，支持并推荐使用MCDR v1.0+。  
+其将备份的代码抽象出来，并且没有高程度的冗余。因而本插件不再并且没有必要进行更新，如有在v1.0+的使用需求，请移步见[TimedQBM](https://github.com/TISUnion/TimedQBM)。  
+
 # AutoQuickBackup
 ---------
 
